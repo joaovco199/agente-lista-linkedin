@@ -12,6 +12,7 @@ out/
 build/
 next-env.d.ts
 .vercel
+tsconfig.tsbuildinfo
 
 # Python (se usar)
 __pycache__/

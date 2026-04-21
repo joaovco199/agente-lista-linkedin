@@ -54,6 +54,8 @@ export type PerfilEnriquecido = {
   dados: PerfilProxycurl;
 };
 
+export type DecisaoCandidato = "aceito" | "rejeitado";
+
 export type Candidato = {
   id: string;
   vaga_id: string;
@@ -65,5 +67,8 @@ export type Candidato = {
   score: number | null;
   justificativa: string | null;
   highlights: Highlight[] | null;
+  decisao: DecisaoCandidato | null;
+  decisao_razao: string | null;
+  decisao_at: string | null;
   created_at: string;
 };

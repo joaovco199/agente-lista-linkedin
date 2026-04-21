@@ -30,6 +30,9 @@ create table public.candidatos_gerados (
   score int check (score between 1 and 5),
   justificativa text,
   highlights jsonb,
+  decisao text check (decisao is null or decisao in ('aceito','rejeitado')),
+  decisao_razao text,
+  decisao_at timestamptz,
   created_at timestamptz not null default now()
 );
 

@@ -20,13 +20,15 @@ Sua tarefa:
 3. Dar a cada um um score de 1 a 5 e justificativa.
 
 Regras de scoring (ajustadas para dados limitados):
-- 5 = título + snippet batem perfeitamente com ICP e com perfis bons; zero sinal dos maus.
-- 4 = título claro + snippet sugere match forte.
+- 5 = título + snippet batem perfeitamente com ICP e com perfis bons; zero sinal dos maus; localização bate.
+- 4 = título claro + snippet sugere match forte; localização bate.
 - 3 = título plausível mas snippet ambíguo ou pouco informativo — vale conversa.
 - 2 = sinais fracos, só se faltar alternativa.
 - 1 = fora do ICP ou bate com perfis a evitar.
 
-**Regra crítica:** a justificativa DEVE citar trechos literais do título ou snippet. Se o snippet for vazio ou irrelevante ("ver o perfil completo no LinkedIn"), o score máximo é 3 e a justificativa deve deixar claro que foi só pelo título.
+**Regra crítica de localização:** a localização da vaga é não-negociável. Você encontra a localização do candidato em: (a) subdomínio da URL (ex: \`br.linkedin.com\` = Brasil), (b) snippet ("São Paulo, SP", "Portugal"), (c) título. Se a localização do candidato contradiz claramente a do ICP (ex: ICP pede Brasil e o snippet mostra "Lisboa, Portugal"), o score MÁXIMO é 2. Se a localização for ambígua ou não aparecer, continue normal mas NÃO dê 5 sem confirmar.
+
+**Regra crítica de evidência:** a justificativa DEVE citar trechos literais do título ou snippet. Se o snippet for vazio ou irrelevante ("ver o perfil completo no LinkedIn"), o score máximo é 3 e a justificativa deve deixar claro que foi só pelo título.
 
 Como a fonte é limitada, **sempre inclua pelo menos 1 highlight** citando título ou snippet (fonte: "titulo" ou "snippet").
 

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DecisaoCandidato } from "@/components/decisao-candidato";
 import type { Vaga } from "@/types/vaga";
 import type { Candidato, Highlight } from "@/types/candidato";
 
@@ -119,6 +120,11 @@ export default async function ResultadoPage({
                     ))}
                   </div>
                 )}
+                <DecisaoCandidato
+                  candidatoId={c.id}
+                  decisaoAtual={c.decisao}
+                  razaoAtual={c.decisao_razao}
+                />
               </CardContent>
             </Card>
           ))}

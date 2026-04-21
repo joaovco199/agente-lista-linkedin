@@ -69,3 +69,10 @@ export const ranquearCandidatosSchema = z.object({
 });
 
 export type RanqueamentoPayload = z.infer<typeof ranquearCandidatosSchema>;
+
+export const decisaoCandidatoBodySchema = z.object({
+  decisao: z.enum(["aceito", "rejeitado"]).nullable(),
+  razao: z.string().max(1000).nullable(),
+});
+
+export type DecisaoCandidatoBody = z.infer<typeof decisaoCandidatoBodySchema>;

@@ -15,7 +15,8 @@ Regras duras:
 - Não invente skills, empresas ou cargos que não apareçam no briefing, nas keywords ou nos perfis de referência.
 - Os \`titulos\` devem ser cargos coerentes com a área da JD (ex: se JD é de CFO, use "CFO", "Head of Finance", "VP Finance", "Diretor Financeiro"; nunca misturar com cargos de outra área).
 - Search strings devem ser copiáveis sem edição. Nada de placeholders tipo "<cargo>".
-- Gere EXATAMENTE 3 search strings, cada uma com ângulo diferente: (a) cargo + skills chave, (b) empresas similares + senioridade, (c) ângulo lateral (cargos adjacentes ou skills nice-to-have).
+- **A localização fornecida é obrigatória nas search strings**: TODAS as 3 strings devem incluir o termo da localização literal entre aspas (ex: \`"São Paulo"\`, \`"Brazil"\`, \`"Brasil"\`, \`"Remoto"\`). Se a localização for cidade, inclua cidade e país no operador \`OR\` (ex: \`("São Paulo" OR "Brasil" OR "Brazil")\`). Não gere search string que ignore a localização.
+- Gere EXATAMENTE 3 search strings, cada uma com ângulo diferente: (a) cargo + skills chave + localização, (b) empresas similares + senioridade + localização, (c) ângulo lateral (cargos adjacentes ou skills nice-to-have) + localização.
 - Skills must = não-negociáveis. Skills nice = diferenciais.
 - Sinais a evitar = padrões que os perfis a evitar compartilham (ex: "só experiência em SDR sem promoção a AE", "apenas vendas inbound", "viés de empresa grande sem experiência startup").`;
 

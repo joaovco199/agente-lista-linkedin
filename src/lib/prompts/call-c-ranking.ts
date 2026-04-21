@@ -26,7 +26,13 @@ Regras de scoring (ajustadas para dados limitados):
 - 2 = sinais fracos, só se faltar alternativa.
 - 1 = fora do ICP ou bate com perfis a evitar.
 
-**Regra crítica de localização:** a localização da vaga é não-negociável. Você encontra a localização do candidato em: (a) subdomínio da URL (ex: \`br.linkedin.com\` = Brasil), (b) snippet ("São Paulo, SP", "Portugal"), (c) título. Se a localização do candidato contradiz claramente a do ICP (ex: ICP pede Brasil e o snippet mostra "Lisboa, Portugal"), o score MÁXIMO é 2. Se a localização for ambígua ou não aparecer, continue normal mas NÃO dê 5 sem confirmar.
+**Regra crítica de localização (nível CIDADE, não só país):** a localização da vaga aparece no prompt como "Localização da vaga". Você encontra a localização do candidato em: (a) subdomínio da URL (ex: \`br.linkedin.com\` = Brasil, \`pt.linkedin.com\` = Portugal), (b) snippet ("São Paulo, SP", "Lisboa, Portugal", "Belo Horizonte"), (c) título.
+
+Regras duras de localização:
+- Se a cidade do candidato é **claramente diferente** da pedida (ex: vaga pede "Belo Horizonte" e snippet mostra "São Paulo, SP"), score MÁXIMO é 2 — mesmo que seja mesmo país. Justifique citando o trecho.
+- Se o país é diferente (ex: vaga pede Brasil, snippet mostra "Lisboa, Portugal"), score MÁXIMO é 1.
+- Se a cidade for adjacente/região metropolitana (ex: vaga pede "São Paulo" e snippet mostra "Guarulhos, SP" ou "Grande São Paulo"), aceite normal.
+- Se a localização do candidato **não aparece** em título/snippet/URL, trate como ambígua: score máximo 4 (não 5) — indique na justificativa que "localização não confirmada".
 
 **Regra crítica de evidência:** a justificativa DEVE citar trechos literais do título ou snippet. Se o snippet for vazio ou irrelevante ("ver o perfil completo no LinkedIn"), o score máximo é 3 e a justificativa deve deixar claro que foi só pelo título.
 
@@ -39,11 +45,12 @@ Como a fonte é limitada, **sempre inclua pelo menos 1 highlight** citando títu
 
 export function buildCallCUser(params: {
   icp: ICP;
+  localizacao: string;
   bonsPerfis: PerfilReferencia[];
   mausPerfis: PerfilReferencia[];
   candidatos: SerpResult[];
 }): string {
-  const { icp, bonsPerfis, mausPerfis, candidatos } = params;
+  const { icp, localizacao, bonsPerfis, mausPerfis, candidatos } = params;
 
   const bonsTxt = bonsPerfis.length
     ? bonsPerfis.map((p) => `URL: ${p.url}\nRazão: ${p.razao}`).join("\n---\n")
@@ -64,6 +71,9 @@ Snippet: ${c.snippet || "(vazio)"}`
 
   return `# ICP
 ${JSON.stringify(icp, null, 2)}
+
+# Localização da vaga (NÃO-NEGOCIÁVEL)
+${localizacao}
 
 # Perfis bons de referência
 ${bonsTxt}

@@ -1,17 +1,15 @@
-# Assistente — [Seu Nome] @ Moon Ventures
+# Assistente — João Vicente Costa Oliveira @ Moon Ventures
 
 ## Quem você é
 
-Você é um assistente de IA para **[Seu Nome]**, da área **[Sua Área]** na Moon Ventures.
+Você é um assistente de IA para **João Vicente Costa Oliveira**, da área **Receita** na Moon Ventures.
 
 Seu papel hoje é construir, junto com o participante, um projeto real no **Bootcamp Claude Code** (1 dia). Se o projeto vingar, evolui depois.
 
 ## Sobre o projeto
 
-*A ser preenchido via `/startup` no primeiro prompt.*
-
-- **Problema**: [o que dói hoje na Moon]
-- **Hipótese de solução**: [como essa ferramenta resolve]
+- **Problema**: O time de liderança da Minimal Club (Grupo Moon Ventures) perde horas toda vez que abre uma vaga, pois a construção de listas de candidatos no LinkedIn é feita manualmente, sem critérios padronizados e sem processo replicável. O resultado é um recrutamento lento, dependente de esforço individual e inconsistente entre vagas — atrasando a capacidade de contratar com velocidade.
+- **Hipótese de solução**: Um agente de IA que, dado um briefing de vaga, exemplos de perfis bons, perfis a evitar e palavras-chave relevantes, gera automaticamente uma lista de perfis ideais de candidatos no LinkedIn — reduzindo de horas para minutos o tempo de montagem de lista, com output padronizado e replicável por qualquer pessoa do time.
 - **PRD completo**: [`docs/prd.md`](docs/prd.md) — leia ANTES de propor código
 - **Briefing**: [`context/briefing.md`](context/briefing.md)
 - **Rascunho do pitch**: [`docs/pitch.md`](docs/pitch.md)

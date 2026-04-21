@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BotaoGerarLista } from "@/components/botao-gerar-lista";
+import { RefinarBriefing } from "@/components/refinar-briefing";
 import type { Vaga } from "@/types/vaga";
 
 export const dynamic = "force-dynamic";
@@ -112,12 +113,16 @@ export default async function DirecionamentoPage({
         </Card>
       )}
 
-      <div className="mt-8 flex items-center justify-between gap-4 rounded-md border border-border bg-muted/30 p-4">
+      <div className="mt-6">
+        <RefinarBriefing vagaId={id} />
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-4 rounded-md border border-border bg-muted/30 p-4">
         <div className="text-sm">
           <p className="font-medium">Pronto pra gerar a lista?</p>
           <p className="text-muted-foreground">
-            Executa SerpApi (descoberta) + Proxycurl (enriquecimento) + ranking
-            do Claude. Leva ~45-75s.
+            Busca no Google via SerpApi + ranking do Claude com base no ICP.
+            Leva ~15-25s.
           </p>
           {status === "lista_gerada" && (
             <Link

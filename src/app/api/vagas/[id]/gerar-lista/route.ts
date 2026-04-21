@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { callClaudeWithTool } from "@/lib/anthropic";
 import { supabase } from "@/lib/supabase";
-import { serpapiSearch, type SerpResult } from "@/lib/serpapi";
+import {
+  serpapiSearch,
+  filterByCountry,
+  inferCountryFromLocation,
+  type SerpResult,
+} from "@/lib/serpapi";
 import {
   buildCallCUser,
   callCSystem,
@@ -48,12 +53,19 @@ export async function POST(
   const queries =
     googleStrings.length > 0 ? googleStrings : vaga.search_strings;
 
+  const desiredCountry = inferCountryFromLocation(vaga.localizacao);
   let serpResults: SerpResult[] = [];
   const queriesTentadas: string[] = [];
   for (const q of queries) {
     try {
       queriesTentadas.push(q.string);
-      const results = await serpapiSearch(q.string, 20);
+      const raw = await serpapiSearch(q.string, 20, {
+        location: vaga.localizacao,
+        gl: desiredCountry ?? "br",
+      });
+      const filtered = filterByCountry(raw, desiredCountry);
+      // Se o filtro derrubou tudo, prefere raw (Claude ainda vai penalizar).
+      const results = filtered.length > 0 ? filtered : raw;
       if (results.length >= 3) {
         serpResults = results;
         break;

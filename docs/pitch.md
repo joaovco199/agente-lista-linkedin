@@ -20,7 +20,7 @@ Feedback loop: aprovação/rejeição de cada candidato alimenta a próxima gera
 
 ## Demo (50s)
 
-- **URL Vercel**: _a preencher após deploy completar_
+- **URL Vercel**: https://agente-lista-linkedin.vercel.app
 - **Passo 1**: Abre a landing, clica em "+ Nova vaga"
 - **Passo 2**: Preenche JD + cargo + cidade + modalidade + 1 bom perfil de referência
 - **Passo 3**: Recebe ICP + 3 search strings → clica "Gerar lista"

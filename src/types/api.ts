@@ -3,10 +3,21 @@ import { z } from "zod";
 export const perfilReferenciaSchema = z.object({
   url: z
     .string()
-    .url("Precisa ser uma URL válida")
-    .refine((url) => url.includes("linkedin.com/"), {
-      message: "Precisa ser uma URL do LinkedIn",
-    }),
+    .trim()
+    .transform((url) => {
+      if (!url) return url;
+      // Aceita URLs coladas sem protocolo (ex: "linkedin.com/in/fulano")
+      if (/^https?:\/\//i.test(url)) return url;
+      return `https://${url}`;
+    })
+    .pipe(
+      z
+        .string()
+        .url("Precisa ser uma URL válida")
+        .refine((url) => url.includes("linkedin.com/"), {
+          message: "Precisa ser uma URL do LinkedIn",
+        })
+    ),
   razao: z
     .string()
     .min(10, "Explique em pelo menos 10 caracteres por que o perfil encaixa"),

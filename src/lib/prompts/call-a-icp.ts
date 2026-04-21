@@ -20,19 +20,23 @@ Regras duras:
 - Sinais a evitar = padrões que os perfis a evitar compartilham (ex: "só experiência em SDR sem promoção a AE", "apenas vendas inbound", "viés de empresa grande sem experiência startup").`;
 
 export function buildCallAUser(form: FormularioVaga): string {
-  const bons = form.bons_perfis
-    .map(
-      (p, i) => `${i + 1}. URL: ${p.url}
+  const bons = form.bons_perfis.length
+    ? form.bons_perfis
+        .map(
+          (p, i) => `${i + 1}. URL: ${p.url}
    Razão de ser qualificado: ${p.razao}`
-    )
-    .join("\n");
+        )
+        .join("\n")
+    : "(nenhum bom perfil de referência fornecido — baseie-se apenas na JD/keywords)";
 
-  const maus = form.maus_perfis
-    .map(
-      (p, i) => `${i + 1}. URL: ${p.url}
+  const maus = form.maus_perfis.length
+    ? form.maus_perfis
+        .map(
+          (p, i) => `${i + 1}. URL: ${p.url}
    Razão de ser desqualificado: ${p.razao}`
-    )
-    .join("\n");
+        )
+        .join("\n")
+    : "(nenhum perfil a evitar fornecido — derive `sinais_evitar` da JD quando possível)";
 
   return `# Briefing da vaga
 
@@ -48,10 +52,10 @@ ${form.keywords}
 ## Localização
 ${form.localizacao}
 
-## 5 bons perfis de referência (o tipo de pessoa que queremos)
+## Bons perfis de referência (${form.bons_perfis.length})
 ${bons}
 
-## 5 perfis a evitar (anti-exemplos)
+## Perfis a evitar (${form.maus_perfis.length})
 ${maus}
 
 Gere o direcionamento chamando a ferramenta \`gerar_direcionamento\`.`;

@@ -3,44 +3,78 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { PerfilReferenciaInput } from "./perfil-referencia-input";
-import { criarVagaBodySchema, type CriarVagaBody } from "@/types/api";
+import { criarVagaBodySchema } from "@/types/api";
 
-const perfilVazio = { url: "", razao: "" };
+// Tipo do form (aceita slots vazios — diferente do body que o backend valida).
+export type FormValues = {
+  jd: string;
+  keywords: string;
+  cargo_senioridade: string;
+  localizacao: string;
+  bons_perfis: { url: string; razao: string }[];
+  maus_perfis: { url: string; razao: string }[];
+};
 
-const defaultValues: CriarVagaBody = {
+const slotVazio = { url: "", razao: "" };
+
+const defaultValues: FormValues = {
   jd: "",
   keywords: "",
   cargo_senioridade: "",
   localizacao: "",
-  bons_perfis: Array.from({ length: 5 }, () => ({ ...perfilVazio })),
-  maus_perfis: Array.from({ length: 5 }, () => ({ ...perfilVazio })),
+  bons_perfis: Array.from({ length: 5 }, () => ({ ...slotVazio })),
+  maus_perfis: Array.from({ length: 5 }, () => ({ ...slotVazio })),
 };
+
+function slotPreenchido(p: { url: string; razao: string }): boolean {
+  return p.url.trim() !== "" || p.razao.trim() !== "";
+}
 
 export function FormNovaVaga() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const form = useForm<CriarVagaBody>({
-    resolver: zodResolver(criarVagaBodySchema),
-    defaultValues,
-  });
+  const form = useForm<FormValues>({ defaultValues });
 
-  async function onSubmit(values: CriarVagaBody) {
+  async function onSubmit(values: FormValues) {
+    // Filtra slots completamente vazios. Slots parcialmente preenchidos
+    // (só URL ou só razão) vão pra validação estrita.
+    const payload = {
+      ...values,
+      bons_perfis: values.bons_perfis.filter(slotPreenchido),
+      maus_perfis: values.maus_perfis.filter(slotPreenchido),
+    };
+
+    const parsed = criarVagaBodySchema.safeParse(payload);
+    if (!parsed.success) {
+      const msgs = parsed.error.issues
+        .slice(0, 3)
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join(" · ");
+      toast.error(msgs || "Dados inválidos");
+      return;
+    }
+
     setLoading(true);
     try {
       const resp = await fetch("/api/vagas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(parsed.data),
       });
       const json = await resp.json();
       if (!resp.ok) {
@@ -80,11 +114,6 @@ export function FormNovaVaga() {
               placeholder="Cole a JD completa da vaga..."
               {...form.register("jd")}
             />
-            {form.formState.errors.jd && (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.jd.message}
-              </p>
-            )}
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
@@ -94,11 +123,6 @@ export function FormNovaVaga() {
                 placeholder="ex: Account Executive Sênior"
                 {...form.register("cargo_senioridade")}
               />
-              {form.formState.errors.cargo_senioridade && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.cargo_senioridade.message}
-                </p>
-              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="localizacao">Localização</Label>
@@ -107,11 +131,6 @@ export function FormNovaVaga() {
                 placeholder="ex: São Paulo, Brasil (ou Remoto — Brasil)"
                 {...form.register("localizacao")}
               />
-              {form.formState.errors.localizacao && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.localizacao.message}
-                </p>
-              )}
             </div>
           </div>
           <div className="grid gap-2">
@@ -121,11 +140,6 @@ export function FormNovaVaga() {
               placeholder="ex: outbound, HubSpot, Salesforce, SaaS B2B"
               {...form.register("keywords")}
             />
-            {form.formState.errors.keywords && (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.keywords.message}
-              </p>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -134,8 +148,9 @@ export function FormNovaVaga() {
         <CardHeader>
           <CardTitle>Perfis de referência</CardTitle>
           <CardDescription>
-            5 perfis do LinkedIn que encaixam (bons) e 5 que não (anti-exemplos).
-            Para cada um, explique a razão — isso alimenta o ranking final.
+            Pelo menos <strong>1 bom perfil</strong> é obrigatório. Os demais
+            slots (bons e maus) são opcionais — deixe em branco se não quiser
+            usar. Quanto mais exemplos com razão, melhor o ranking.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6">
@@ -149,6 +164,7 @@ export function FormNovaVaga() {
                 form={form}
                 campo="bons_perfis"
                 index={i}
+                obrigatorio={i === 0}
               />
             ))}
           </section>
@@ -156,6 +172,9 @@ export function FormNovaVaga() {
           <section className="grid gap-3">
             <h3 className="text-base font-semibold">
               Perfis a evitar (anti-exemplos)
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                todos opcionais
+              </span>
             </h3>
             {Array.from({ length: 5 }).map((_, i) => (
               <PerfilReferenciaInput

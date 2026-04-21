@@ -19,8 +19,13 @@ export const criarVagaBodySchema = z.object({
     .string()
     .min(3, "Informe cargo e senioridade (ex: AE Sênior)"),
   localizacao: z.string().min(2, "Informe a localização alvo"),
-  bons_perfis: z.array(perfilReferenciaSchema).length(5, "Forneça 5 bons perfis"),
-  maus_perfis: z.array(perfilReferenciaSchema).length(5, "Forneça 5 perfis a evitar"),
+  bons_perfis: z
+    .array(perfilReferenciaSchema)
+    .min(1, "Forneça pelo menos 1 bom perfil de referência")
+    .max(5, "Máximo de 5 bons perfis"),
+  maus_perfis: z
+    .array(perfilReferenciaSchema)
+    .max(5, "Máximo de 5 perfis a evitar"),
 });
 
 export type CriarVagaBody = z.infer<typeof criarVagaBodySchema>;

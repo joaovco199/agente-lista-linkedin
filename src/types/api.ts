@@ -46,3 +46,32 @@ export const direcionamentoSchema = z.object({
 });
 
 export type DirecionamentoPayload = z.infer<typeof direcionamentoSchema>;
+
+export const selecionarPerfisSchema = z.object({
+  selecionados: z
+    .array(
+      z.object({
+        url: z.string().url(),
+        motivo_curto: z.string(),
+      })
+    )
+    .max(10),
+});
+
+export const highlightSchema = z.object({
+  trecho: z.string(),
+  fonte: z.enum(["sobre", "experiencia", "skill", "educacao"]),
+});
+
+export const ranquearCandidatosSchema = z.object({
+  ranking: z.array(
+    z.object({
+      linkedin_url: z.string(),
+      score: z.number().int().min(1).max(5),
+      justificativa: z.string(),
+      highlights: z.array(highlightSchema),
+    })
+  ),
+});
+
+export type RanqueamentoPayload = z.infer<typeof ranquearCandidatosSchema>;

@@ -12,7 +12,15 @@ import {
   callCSystem,
   callCTool,
 } from "@/lib/prompts/call-c-ranking";
-import { ranquearCandidatosSchema } from "@/types/api";
+import {
+  buildCallARefineUser,
+  callARefineSystem,
+  callARefineTool,
+} from "@/lib/prompts/call-a-refine";
+import {
+  direcionamentoSchema,
+  ranquearCandidatosSchema,
+} from "@/types/api";
 import type { PerfilReferencia, Vaga } from "@/types/vaga";
 import type { Candidato } from "@/types/candidato";
 
@@ -45,15 +53,6 @@ export async function POST(
     );
   }
 
-  // 2) SerpApi — tenta queries `plataforma=google` primeiro, pois são as que
-  // funcionam via Google search. Se as google forem vazias, tenta as linkedin
-  // também (operadores booleanos nativos podem funcionar no Google também).
-  const googleStrings = vaga.search_strings.filter(
-    (s) => s.plataforma === "google"
-  );
-  const queries =
-    googleStrings.length > 0 ? googleStrings : vaga.search_strings;
-
   // 2) Carrega candidatos já existentes pra preservar os decididos e evitar duplicatas.
   const { data: existentes } = await supabase
     .from("candidatos_gerados")
@@ -70,6 +69,65 @@ export async function POST(
   const rejeitadosAnteriores: PerfilReferencia[] = (existentes ?? [])
     .filter((c) => c.decisao === "rejeitado" && c.decisao_razao)
     .map((c) => ({ url: c.linkedin_url, razao: c.decisao_razao! }));
+
+  // 2.4) Se há decisões anteriores, refina ICP + search strings ANTES de buscar.
+  // Isso garante que o Google retorne perfis diferentes dos já avaliados.
+  let icpEmUso = vaga.icp;
+  let searchStringsEmUso = vaga.search_strings;
+  let icpFoiRefinado = false;
+
+  if (aceitosAnteriores.length > 0 || rejeitadosAnteriores.length > 0) {
+    try {
+      const rawRefine = await callClaudeWithTool<unknown>({
+        system: callARefineSystem,
+        user: buildCallARefineUser({
+          form: {
+            jd: vaga.jd,
+            keywords: vaga.keywords,
+            cargo_senioridade: vaga.cargo_senioridade,
+            localizacao: vaga.localizacao,
+            modalidade: vaga.modalidade ?? "presencial",
+            bons_perfis: vaga.bons_perfis,
+            maus_perfis: vaga.maus_perfis,
+          },
+          icpAtual: vaga.icp,
+          searchStringsAtuais: vaga.search_strings,
+          modalidade: vaga.modalidade,
+          aceitos: aceitosAnteriores,
+          rejeitados: rejeitadosAnteriores,
+        }),
+        tool: callARefineTool,
+        model: "default",
+        maxTokens: 2048,
+      });
+      const refined = direcionamentoSchema.parse(rawRefine);
+      icpEmUso = refined.icp;
+      searchStringsEmUso = refined.search_strings;
+      icpFoiRefinado = true;
+
+      // Persiste o ICP refinado na vaga (sobrescreve o anterior).
+      await supabase
+        .from("vagas")
+        .update({
+          icp: refined.icp,
+          search_strings: refined.search_strings,
+        })
+        .eq("id", vagaId);
+    } catch (err) {
+      console.warn(
+        "[gerar-lista] Call A-refine falhou, seguindo com ICP atual",
+        err
+      );
+    }
+  }
+
+  // 2.5) Monta lista de queries (preferindo plataforma=google), usando as
+  // search strings (refinadas se tiver decisões).
+  const googleStrings = searchStringsEmUso.filter(
+    (s) => s.plataforma === "google"
+  );
+  const queries =
+    googleStrings.length > 0 ? googleStrings : searchStringsEmUso;
 
   const desiredCountry = inferCountryFromLocation(vaga.localizacao);
   let serpResults: SerpResult[] = [];
@@ -125,7 +183,7 @@ export async function POST(
     const raw = await callClaudeWithTool<unknown>({
       system: callCSystem,
       user: buildCallCUser({
-        icp: vaga.icp,
+        icp: icpEmUso,
         localizacao: vaga.localizacao,
         modalidade: vaga.modalidade,
         // Concatena perfis originais do briefing + decisões de rodadas anteriores.
@@ -204,6 +262,7 @@ export async function POST(
       total_ranqueados: ranking.length,
       total_aceitos_preservados: aceitosAnteriores.length,
       total_rejeitados_preservados: rejeitadosAnteriores.length,
+      icp_refinado: icpFoiRefinado,
       queriesTentadas,
     },
   });

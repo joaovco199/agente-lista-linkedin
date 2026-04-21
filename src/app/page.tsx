@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { BotaoExcluirVaga } from "@/components/botao-excluir-vaga";
 import { Sparkles, Plus } from "lucide-react";
 import type { Vaga } from "@/types/vaga";
 
@@ -89,53 +90,54 @@ export default async function HomePage() {
         ) : (
           <div className="grid gap-3">
             {lista.map((v) => (
-              <Link
+              <Card
                 key={v.id}
-                href={
-                  v.status === "lista_gerada"
-                    ? `/vaga/${v.id}/resultado`
-                    : `/vaga/${v.id}/direcionamento`
-                }
-                className="group"
+                className="transition hover:border-primary/60"
               >
-                <Card className="transition hover:border-primary/60">
-                  <CardContent className="flex items-center justify-between gap-4 p-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-base font-medium">
-                        {v.cargo_senioridade}
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                        <span>{v.localizacao}</span>
-                        {v.modalidade && (
-                          <>
-                            <span>·</span>
-                            <span>{v.modalidade}</span>
-                          </>
-                        )}
-                        <span>·</span>
-                        <span>{formatDate(v.created_at)}</span>
-                      </div>
+                <CardContent className="flex items-center justify-between gap-4 p-4">
+                  <Link
+                    href={
+                      v.status === "lista_gerada"
+                        ? `/vaga/${v.id}/resultado`
+                        : `/vaga/${v.id}/direcionamento`
+                    }
+                    className="group min-w-0 flex-1"
+                  >
+                    <div className="truncate text-base font-medium">
+                      {v.cargo_senioridade}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Badge
-                        variant={
-                          v.status === "lista_gerada"
-                            ? "default"
-                            : v.status === "erro"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                        className="text-[10px]"
-                      >
-                        {STATUS_LABEL[v.status]}
-                      </Badge>
-                      <span className="text-muted-foreground transition group-hover:text-foreground">
-                        →
-                      </span>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      <span>{v.localizacao}</span>
+                      {v.modalidade && (
+                        <>
+                          <span>·</span>
+                          <span>{v.modalidade}</span>
+                        </>
+                      )}
+                      <span>·</span>
+                      <span>{formatDate(v.created_at)}</span>
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        v.status === "lista_gerada"
+                          ? "default"
+                          : v.status === "erro"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                      className="text-[10px]"
+                    >
+                      {STATUS_LABEL[v.status]}
+                    </Badge>
+                    <BotaoExcluirVaga
+                      vagaId={v.id}
+                      titulo={v.cargo_senioridade}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}

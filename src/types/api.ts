@@ -52,20 +52,9 @@ export const direcionamentoSchema = z.object({
 
 export type DirecionamentoPayload = z.infer<typeof direcionamentoSchema>;
 
-export const selecionarPerfisSchema = z.object({
-  selecionados: z
-    .array(
-      z.object({
-        url: z.string().url(),
-        motivo_curto: z.string(),
-      })
-    )
-    .max(10),
-});
-
 export const highlightSchema = z.object({
   trecho: z.string(),
-  fonte: z.enum(["sobre", "experiencia", "skill", "educacao"]),
+  fonte: z.enum(["titulo", "snippet", "sobre", "experiencia", "skill", "educacao"]),
 });
 
 export const ranquearCandidatosSchema = z.object({

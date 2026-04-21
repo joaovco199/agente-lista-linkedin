@@ -2,21 +2,12 @@ import { NextResponse } from "next/server";
 import { callClaudeWithTool } from "@/lib/anthropic";
 import { supabase } from "@/lib/supabase";
 import { serpapiSearch, type SerpResult } from "@/lib/serpapi";
-import { proxycurlBatch, resumoPerfil } from "@/lib/proxycurl";
-import {
-  buildCallBUser,
-  callBSystem,
-  callBTool,
-} from "@/lib/prompts/call-b-prefilter";
 import {
   buildCallCUser,
   callCSystem,
   callCTool,
 } from "@/lib/prompts/call-c-ranking";
-import {
-  ranquearCandidatosSchema,
-  selecionarPerfisSchema,
-} from "@/types/api";
+import { ranquearCandidatosSchema } from "@/types/api";
 import type { Vaga } from "@/types/vaga";
 
 export const maxDuration = 60;
@@ -31,7 +22,7 @@ export async function POST(
 ) {
   const { id: vagaId } = await params;
 
-  // 1) Carrega vaga completa
+  // 1) Carrega vaga completa.
   const { data: vaga, error: fetchErr } = await supabase
     .from("vagas")
     .select("*")
@@ -41,24 +32,21 @@ export async function POST(
   if (fetchErr || !vaga) {
     return NextResponse.json({ error: "Vaga não encontrada" }, { status: 404 });
   }
-  if (vaga.status === "rascunho") {
-    return NextResponse.json(
-      { error: "Direcionamento ainda não foi gerado pra esta vaga" },
-      { status: 409 }
-    );
-  }
   if (!vaga.icp || !vaga.search_strings || vaga.search_strings.length === 0) {
     return NextResponse.json(
-      { error: "Vaga sem ICP ou search strings" },
+      { error: "Vaga sem ICP ou search strings — gere o direcionamento antes." },
       { status: 409 }
     );
   }
 
-  // 2) SerpApi — pega a primeira search string plataforma=google, fallback pra qualquer uma
+  // 2) SerpApi — tenta queries `plataforma=google` primeiro, pois são as que
+  // funcionam via Google search. Se as google forem vazias, tenta as linkedin
+  // também (operadores booleanos nativos podem funcionar no Google também).
   const googleStrings = vaga.search_strings.filter(
     (s) => s.plataforma === "google"
   );
-  const queries = googleStrings.length > 0 ? googleStrings : vaga.search_strings;
+  const queries =
+    googleStrings.length > 0 ? googleStrings : vaga.search_strings;
 
   let serpResults: SerpResult[] = [];
   const queriesTentadas: string[] = [];
@@ -81,59 +69,14 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "Nenhum resultado do Google/LinkedIn pras search strings geradas. Refine o briefing.",
+          "Nenhum resultado do Google pras search strings. Refine o briefing.",
         queriesTentadas,
       },
       { status: 502 }
     );
   }
 
-  // 3) Call B — pré-filtro dos 10 mais promissores
-  let selecionados: { url: string; motivo_curto: string }[];
-  try {
-    const raw = await callClaudeWithTool<unknown>({
-      system: callBSystem,
-      user: buildCallBUser(vaga.icp, serpResults),
-      tool: callBTool,
-      model: "default",
-      maxTokens: 2048,
-    });
-    const parsed = selecionarPerfisSchema.parse(raw);
-    selecionados = parsed.selecionados;
-  } catch (err) {
-    console.error("[gerar-lista] Call B error", err);
-    await marcarErro(vagaId);
-    return NextResponse.json(
-      { error: "Falha no pré-filtro Claude (Call B)" },
-      { status: 502 }
-    );
-  }
-
-  if (selecionados.length === 0) {
-    await marcarErro(vagaId);
-    return NextResponse.json(
-      { error: "Claude não selecionou nenhum perfil dos resultados do Google." },
-      { status: 502 }
-    );
-  }
-
-  // 4) Proxycurl — enrichment em paralelo
-  const urls = selecionados.map((s) => s.url);
-  const enriquecidos = await proxycurlBatch(urls);
-
-  if (enriquecidos.length === 0) {
-    await marcarErro(vagaId);
-    return NextResponse.json(
-      {
-        error:
-          "Nenhum perfil foi enriquecido pelo Proxycurl. Verifique saldo/chave.",
-        tentados: urls.length,
-      },
-      { status: 502 }
-    );
-  }
-
-  // 5) Call C — ranking final
+  // 3) Call C — Claude filtra + ranqueia em uma só chamada.
   let ranking;
   try {
     const raw = await callClaudeWithTool<unknown>({
@@ -142,7 +85,7 @@ export async function POST(
         icp: vaga.icp,
         bonsPerfis: vaga.bons_perfis,
         mausPerfis: vaga.maus_perfis,
-        candidatos: enriquecidos,
+        candidatos: serpResults,
       }),
       tool: callCTool,
       model: "default",
@@ -154,31 +97,39 @@ export async function POST(
     console.error("[gerar-lista] Call C error", err);
     await marcarErro(vagaId);
     return NextResponse.json(
-      { error: "Falha no ranking Claude (Call C)" },
+      { error: "Falha no ranking Claude" },
       { status: 502 }
     );
   }
 
-  // 6) Persiste candidatos em bulk
-  const byUrl = new Map(enriquecidos.map((e) => [e.linkedin_url, e]));
+  if (ranking.length === 0) {
+    await marcarErro(vagaId);
+    return NextResponse.json(
+      { error: "Claude não conseguiu ranquear nenhum candidato." },
+      { status: 502 }
+    );
+  }
+
+  // 4) Persiste candidatos — usa o snippet/title do SerpApi como nome/cargo
+  // quando possível (não temos Proxycurl nessa versão).
+  const byUrl = new Map(serpResults.map((r) => [r.url, r]));
   const rows = ranking.map((r) => {
-    const enriched = byUrl.get(r.linkedin_url);
-    const resumo = enriched
-      ? resumoPerfil(enriched)
-      : { nome: null, cargo: null, empresa: null };
+    const serp = byUrl.get(r.linkedin_url);
     return {
       vaga_id: vagaId,
       linkedin_url: r.linkedin_url,
-      nome: resumo.nome,
-      cargo: resumo.cargo,
-      empresa: resumo.empresa,
-      enrichment_json: enriched?.dados ?? null,
+      nome: serp?.title?.split(" - ")[0] ?? null,
+      cargo: serp?.title?.split(" - ")[1]?.split(" | ")[0] ?? null,
+      empresa: null,
+      enrichment_json: serp ? { title: serp.title, snippet: serp.snippet } : null,
       score: r.score,
       justificativa: r.justificativa,
       highlights: r.highlights,
     };
   });
 
+  // Apaga candidatos antigos dessa vaga (caso seja re-geração) e insere novos.
+  await supabase.from("candidatos_gerados").delete().eq("vaga_id", vagaId);
   const { error: insertErr } = await supabase
     .from("candidatos_gerados")
     .insert(rows);
@@ -201,8 +152,6 @@ export async function POST(
     data: {
       vagaId,
       total_serp: serpResults.length,
-      total_selecionados: selecionados.length,
-      total_enriquecidos: enriquecidos.length,
       total_ranqueados: ranking.length,
       queriesTentadas,
     },

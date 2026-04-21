@@ -1,4 +1,10 @@
-export type FonteHighlight = "sobre" | "experiencia" | "skill" | "educacao";
+export type FonteHighlight =
+  | "titulo"
+  | "snippet"
+  | "sobre"
+  | "experiencia"
+  | "skill"
+  | "educacao";
 
 export type Highlight = {
   trecho: string;

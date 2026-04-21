@@ -1,20 +1,26 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+// Lazy singleton — evita validar env vars no top-level (que quebraria o
+// `next build` quando a Vercel coleta page data).
+let _anthropic: Anthropic | null = null;
 
-if (!ANTHROPIC_API_KEY) {
-  throw new Error(
-    "ANTHROPIC_API_KEY precisa estar no .env (e nas Environment Variables da Vercel em produção)."
-  );
+function getClient(): Anthropic {
+  if (_anthropic) return _anthropic;
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_API_KEY) {
+    throw new Error(
+      "ANTHROPIC_API_KEY precisa estar no .env (e nas Environment Variables da Vercel em produção)."
+    );
+  }
+  _anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+  return _anthropic;
 }
-
-export const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
 // Modelos usados no pipeline. Centralizado aqui pra facilitar trocas.
 export const MODELS = {
-  // Sonnet 4.6 — rápido e mais barato. Usado nas 3 chamadas do pipeline.
+  // Sonnet 4.6 — rápido e mais barato. Usado nas chamadas do pipeline.
   default: "claude-sonnet-4-6",
-  // Opus 4.7 — qualidade máxima. Disponível caso queiramos subir o Call C depois.
+  // Opus 4.7 — qualidade máxima. Disponível caso queiramos subir um Call depois.
   heavy: "claude-opus-4-7",
 } as const;
 
@@ -43,7 +49,6 @@ type CallClaudeWithToolParams = {
 
 /**
  * Chama o Claude forçando o uso de uma única tool. Retorna o `input` da tool parseado.
- * Lança erro se o modelo não usar a tool (nunca deveria acontecer com tool_choice forçado).
  */
 export async function callClaudeWithTool<T>({
   system,
@@ -52,7 +57,7 @@ export async function callClaudeWithTool<T>({
   model = "default",
   maxTokens = 4096,
 }: CallClaudeWithToolParams): Promise<T> {
-  const response = await anthropic.messages.create({
+  const response = await getClient().messages.create({
     model: MODELS[model],
     max_tokens: maxTokens,
     system,

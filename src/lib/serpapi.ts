@@ -1,11 +1,3 @@
-const SERPAPI_KEY = process.env.SERPAPI_KEY;
-
-if (!SERPAPI_KEY) {
-  throw new Error(
-    "SERPAPI_KEY precisa estar no .env (e nas Environment Variables da Vercel)."
-  );
-}
-
 export type SerpResult = {
   index: number;
   title: string;
@@ -33,6 +25,16 @@ export type SerpSearchOptions = {
   gl?: string;
 };
 
+function getKey(): string {
+  const key = process.env.SERPAPI_KEY;
+  if (!key) {
+    throw new Error(
+      "SERPAPI_KEY precisa estar no .env (e nas Environment Variables da Vercel)."
+    );
+  }
+  return key;
+}
+
 /**
  * Busca no Google via SerpApi e retorna resultados que apontam pra /in/ do LinkedIn.
  * Se `location` não for reconhecida pelo SerpApi, faz retry sem ela (preserva
@@ -45,7 +47,7 @@ export async function serpapiSearch(
 ): Promise<SerpResult[]> {
   const baseParams = {
     q: query,
-    api_key: SERPAPI_KEY!,
+    api_key: getKey(),
     engine: "google",
     num: String(numResults),
     hl: "pt-br",
@@ -62,7 +64,6 @@ export async function serpapiSearch(
 
   let resp = await doFetch(location ?? null);
 
-  // Se deu 400 por `location` não suportada, retry sem location.
   if (!resp.ok && resp.status === 400 && location) {
     const errText = await resp.text();
     if (/location/i.test(errText) && /unsupported/i.test(errText)) {
@@ -111,19 +112,11 @@ function normalizeLinkedinUrl(url: string): string {
 
 // -------- Filtros de localização --------
 
-/**
- * Extrai o country code do subdomínio do LinkedIn (ex: `br.linkedin.com` → "br").
- * Retorna null se não houver subdomínio específico (ex: `www.linkedin.com`).
- */
 export function extractLinkedinCountry(url: string): string | null {
   const match = url.match(/^https?:\/\/([a-z]{2})\.linkedin\.com\//i);
   return match ? match[1].toLowerCase() : null;
 }
 
-/**
- * Mapa simples cidade/país → country code do LinkedIn.
- * Expandir conforme a Moon contratar em mais países.
- */
 const COUNTRY_KEYWORDS: Record<string, string[]> = {
   br: [
     "brasil",
@@ -155,10 +148,6 @@ const COUNTRY_KEYWORDS: Record<string, string[]> = {
   mx: ["mexico", "méxico", "mexico city"],
 };
 
-/**
- * Descobre o country code do LinkedIn esperado a partir do texto de localização
- * que o usuário digitou. Retorna null se não conseguir inferir.
- */
 export function inferCountryFromLocation(loc: string): string | null {
   const normalized = loc.toLowerCase();
   for (const [cc, keywords] of Object.entries(COUNTRY_KEYWORDS)) {
@@ -167,10 +156,6 @@ export function inferCountryFromLocation(loc: string): string | null {
   return null;
 }
 
-/**
- * Filtra resultados, removendo perfis cujo subdomínio do LinkedIn é de país diferente.
- * Mantém URLs sem subdomínio (www/raw) pois são ambíguas.
- */
 export function filterByCountry(
   results: SerpResult[],
   desiredCountry: string | null
@@ -178,7 +163,7 @@ export function filterByCountry(
   if (!desiredCountry) return results;
   return results.filter((r) => {
     const urlCountry = extractLinkedinCountry(r.url);
-    if (!urlCountry) return true; // www.linkedin.com/in/... — mantém
+    if (!urlCountry) return true;
     return urlCountry === desiredCountry;
   });
 }

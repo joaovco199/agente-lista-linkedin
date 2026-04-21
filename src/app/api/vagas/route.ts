@@ -10,6 +10,7 @@ import {
   criarVagaBodySchema,
   direcionamentoSchema,
 } from "@/types/api";
+import { getNotasProspecao } from "@/lib/configuracoes";
 import type { DirecionamentoOutput } from "@/types/vaga";
 
 export const maxDuration = 60;
@@ -59,12 +60,13 @@ export async function POST(request: Request) {
   }
   const vagaId = vagaRow.id as string;
 
-  // 2) Chama o Claude (Call A) com tool-use forçado.
+  // 2) Chama o Claude (Call A) com tool-use forçado, já com notas globais.
+  const notasGlobais = await getNotasProspecao();
   let direcionamento;
   try {
     const raw = await callClaudeWithTool<unknown>({
       system: callASystem,
-      user: buildCallAUser(form),
+      user: buildCallAUser(form, notasGlobais),
       tool: callATool,
       model: "default",
       maxTokens: 2048,

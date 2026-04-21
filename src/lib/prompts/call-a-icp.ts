@@ -35,7 +35,10 @@ Regras duras:
 - Skills must = não-negociáveis. Skills nice = diferenciais.
 - Sinais a evitar = padrões que os perfis a evitar compartilham (ex: "só experiência em SDR sem promoção a AE", "apenas vendas inbound", "viés de empresa grande sem experiência startup").`;
 
-export function buildCallAUser(form: FormularioVaga): string {
+export function buildCallAUser(
+  form: FormularioVaga,
+  notasGlobais?: string
+): string {
   const bons = form.bons_perfis.length
     ? form.bons_perfis
         .map(
@@ -54,9 +57,17 @@ export function buildCallAUser(form: FormularioVaga): string {
         .join("\n")
     : "(nenhum perfil a evitar fornecido — derive `sinais_evitar` da JD quando possível)";
 
+  const notasBloco =
+    notasGlobais && notasGlobais.trim()
+      ? `## Notas globais de prospecção (aplicam a TODAS as vagas)
+${notasGlobais}
+
+`
+      : "";
+
   return `# Briefing da vaga
 
-## Job Description
+${notasBloco}## Job Description
 ${form.jd}
 
 ## Cargo e senioridade desejada

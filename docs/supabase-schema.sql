@@ -39,3 +39,9 @@ create table public.candidatos_gerados (
 
 create index idx_candidatos_vaga_score on public.candidatos_gerados(vaga_id, score desc);
 create index idx_vagas_created_at on public.vagas(created_at desc);
+
+create table public.configuracoes (
+  chave text primary key,
+  valor text,
+  updated_at timestamptz not null default now()
+);

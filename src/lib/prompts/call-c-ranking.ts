@@ -41,15 +41,35 @@ Regras de scoring (ajustadas para dados limitados):
 - 2 = sinais fracos, só se faltar alternativa.
 - 1 = fora do ICP ou bate com perfis a evitar.
 
-**Regra crítica de localização (nível CIDADE, não só país):** a localização da vaga aparece no prompt como "Localização da vaga". Você encontra a localização do candidato em: (a) subdomínio da URL (ex: \`br.linkedin.com\` = Brasil, \`pt.linkedin.com\` = Portugal), (b) snippet ("São Paulo, SP", "Lisboa, Portugal", "Belo Horizonte"), (c) título.
+**Regra crítica 1 — CARGO ATUAL (o mais importante):**
+- O "cargo atual" do candidato aparece no TÍTULO do resultado do Google (ex: "João Silva - Estagiário de Operações | LinkedIn") ou no começo do snippet (ex: "Estagiária na XP · São Paulo").
+- Se o cargo atual **não corresponde a NENHUM** dos \`icp.titulos\`, score MÁXIMO é **2**, mesmo que o perfil tenha experiências passadas que se encaixam.
+- Se o snippet ou título explicitamente mostra que a pessoa é "Ex-estagiário", "Foi estagiário", "Estagiário (2022-2023)" e agora está em cargo mais alto (Analista, Coordenador, Pleno, Sênior, Assistente CLT, etc.), score MÁXIMO é **1** — o ICP busca o cargo ATIVO, não histórico.
+- Se o cargo atual é claramente adjacente mas não idêntico (ex: ICP pede "Estagiário de Operações" e candidato é "Estagiário de Logística"), pode ser score 3 com nota.
+- Se o cargo atual é ambíguo ou não aparece explicitamente, score máximo 3 com nota "cargo atual não confirmado".
+- SEMPRE cite o cargo que você identificou em pelo menos 1 highlight (fonte: "titulo" ou "snippet").
 
-Regras duras de localização:
-- Se a cidade do candidato é **claramente diferente** da pedida (ex: vaga pede "Belo Horizonte" e snippet mostra "São Paulo, SP"), score MÁXIMO é 2 — mesmo que seja mesmo país. Justifique citando o trecho.
-- Se o país é diferente (ex: vaga pede Brasil, snippet mostra "Lisboa, Portugal"), score MÁXIMO é 1.
-- Se a cidade for adjacente/região metropolitana (ex: vaga pede "São Paulo" e snippet mostra "Guarulhos, SP" ou "Grande São Paulo"), aceite normal.
-- Se a localização do candidato **não aparece** em título/snippet/URL, trate como ambígua: score máximo 4 (não 5) — indique na justificativa que "localização não confirmada".
+**Regra crítica 2 — SETOR da empresa:**
+- Se o snippet/título cita empresa de setor claramente FORA dos \`icp.setores\` (ex: vaga pede B2B/varejo e candidato está em software puro, banco, healthcare, consultoria de TI), score MÁXIMO é **3**.
+- Se você não consegue inferir o setor da empresa a partir do snippet, não penalize — trate como setor ambíguo.
 
-**Regra crítica de evidência:** a justificativa DEVE citar trechos literais do título ou snippet. Se o snippet for vazio ou irrelevante ("ver o perfil completo no LinkedIn"), o score máximo é 3 e a justificativa deve deixar claro que foi só pelo título.
+**Regra crítica 3 — LOCALIZAÇÃO (nível CIDADE, não só país):**
+- Você encontra a localização do candidato em: (a) subdomínio da URL (ex: \`br.linkedin.com\` = Brasil), (b) snippet ("São Paulo, SP", "Lisboa, Portugal"), (c) título.
+- Cidade claramente diferente da pedida (mesmo país) → score MÁXIMO **2**.
+- País diferente → score MÁXIMO **1**.
+- Cidade adjacente/região metropolitana (Guarulhos pra São Paulo) → aceita normal.
+- Localização não aparece → score máximo **4** com nota "localização não confirmada".
+
+**Regra crítica 4 — EVIDÊNCIA LITERAL:**
+- A justificativa DEVE citar trechos literais do título ou snippet.
+- Se o snippet é vazio ou irrelevante ("ver o perfil completo no LinkedIn"), score máximo é **3** e a justificativa deve deixar claro que foi só pelo título.
+- A regra de localização e cargo tem PRIORIDADE sobre skills. Skills bonitas não compensam cargo/cidade errada.
+
+**Processo obrigatório pra cada candidato:**
+1. Identifique o cargo atual (cite trecho).
+2. Compare com \`icp.titulos\`. Se não bate, teto 2.
+3. Identifique a cidade. Compare com localização. Aplique teto de localização.
+4. Só depois avalie skills/experiências pra decidir dentro do teto.
 
 Como a fonte é limitada, **sempre inclua pelo menos 1 highlight** citando título ou snippet (fonte: "titulo" ou "snippet").
 
@@ -65,9 +85,17 @@ export function buildCallCUser(params: {
   bonsPerfis: PerfilReferencia[];
   mausPerfis: PerfilReferencia[];
   candidatos: SerpResult[];
+  notasGlobais?: string;
 }): string {
-  const { icp, localizacao, modalidade, bonsPerfis, mausPerfis, candidatos } =
-    params;
+  const {
+    icp,
+    localizacao,
+    modalidade,
+    bonsPerfis,
+    mausPerfis,
+    candidatos,
+    notasGlobais,
+  } = params;
 
   const bonsTxt = bonsPerfis.length
     ? bonsPerfis.map((p) => `URL: ${p.url}\nRazão: ${p.razao}`).join("\n---\n")
@@ -86,7 +114,15 @@ Snippet: ${c.snippet || "(vazio)"}`
     )
     .join("\n\n---\n\n");
 
-  return `# ICP
+  const notasBloco =
+    notasGlobais && notasGlobais.trim()
+      ? `# Notas globais de prospecção (aplicam a TODAS as vagas — use como contexto adicional no ranking)
+${notasGlobais}
+
+`
+      : "";
+
+  return `${notasBloco}# ICP
 ${JSON.stringify(icp, null, 2)}
 
 # Localização e modalidade (NÃO-NEGOCIÁVEL)

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { getNotasProspecao } from "@/lib/configuracoes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BotaoExcluirVaga } from "@/components/botao-excluir-vaga";
+import { NotasProspecao } from "@/components/notas-prospecao";
 import { Sparkles, Plus } from "lucide-react";
 import type { Vaga } from "@/types/vaga";
 
@@ -37,14 +39,17 @@ function formatDate(iso: string): string {
 }
 
 export default async function HomePage() {
-  const { data: vagas } = await supabase
-    .from("vagas")
-    .select("id, created_at, cargo_senioridade, localizacao, modalidade, status")
-    .order("created_at", { ascending: false })
-    .limit(10)
-    .returns<VagaListItem[]>();
+  const [vagasResp, notasGlobais] = await Promise.all([
+    supabase
+      .from("vagas")
+      .select("id, created_at, cargo_senioridade, localizacao, modalidade, status")
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .returns<VagaListItem[]>(),
+    getNotasProspecao(),
+  ]);
 
-  const lista = vagas ?? [];
+  const lista = vagasResp.data ?? [];
 
   return (
     <main className="mx-auto max-w-4xl p-6 md:p-10">
@@ -68,6 +73,8 @@ export default async function HomePage() {
           </Link>
         </Button>
       </header>
+
+      <NotasProspecao valorInicial={notasGlobais} />
 
       <section>
         <div className="mb-3 flex items-baseline justify-between">

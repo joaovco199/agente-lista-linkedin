@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { PerfilReferenciaInput } from "./perfil-referencia-input";
 import { criarVagaBodySchema } from "@/types/api";
+import type { BriefingExtraido } from "@/lib/prompts/extract-briefing";
 
 // Tipo do form (aceita slots vazios — diferente do body que o backend valida).
 export type FormValues = {
@@ -56,7 +57,63 @@ function slotPreenchido(p: { url: string; razao: string }): boolean {
 export function FormNovaVaga() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [textoLivre, setTextoLivre] = useState("");
+  const [extraindo, setExtraindo] = useState(false);
   const form = useForm<FormValues>({ defaultValues });
+
+  async function onExtrair() {
+    if (textoLivre.trim().length < 30) {
+      toast.error("Cola um texto mais longo (≥ 30 caracteres)");
+      return;
+    }
+    setExtraindo(true);
+    toast.loading("Extraindo campos do texto...", { id: "extrair" });
+    try {
+      const resp = await fetch("/api/vagas/extrair-briefing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto: textoLivre.trim() }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) {
+        toast.error(json?.error ?? "Erro ao extrair", { id: "extrair" });
+        return;
+      }
+      const b: BriefingExtraido = json.data;
+      // Preenche os slots de bons/maus perfis preservando 5 slots totais cada.
+      const bons = [
+        ...b.bons_perfis,
+        ...Array.from(
+          { length: Math.max(0, 5 - b.bons_perfis.length) },
+          () => ({ url: "", razao: "" })
+        ),
+      ].slice(0, 5);
+      const maus = [
+        ...b.maus_perfis,
+        ...Array.from(
+          { length: Math.max(0, 5 - b.maus_perfis.length) },
+          () => ({ url: "", razao: "" })
+        ),
+      ].slice(0, 5);
+      form.reset({
+        jd: b.jd,
+        keywords: b.keywords,
+        cargo_senioridade: b.cargo_senioridade,
+        localizacao: b.localizacao,
+        modalidade: b.modalidade,
+        bons_perfis: bons,
+        maus_perfis: maus,
+      });
+      toast.success("Campos preenchidos. Revisa e ajusta o que precisar.", {
+        id: "extrair",
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Falha de rede", { id: "extrair" });
+    } finally {
+      setExtraindo(false);
+    }
+  }
 
   async function onSubmit(values: FormValues) {
     // Filtra slots completamente vazios. Slots parcialmente preenchidos
@@ -106,6 +163,44 @@ export function FormNovaVaga() {
       onSubmit={form.handleSubmit(onSubmit)}
       className="mx-auto grid w-full max-w-3xl gap-6 pb-12"
     >
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Briefing rápido a partir de texto livre
+          </CardTitle>
+          <CardDescription>
+            Cola a descrição da vaga, uma conversa de chat, ou anotações
+            soltas. O Claude extrai e preenche os campos abaixo — você revisa
+            e ajusta antes de gerar o direcionamento.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          <Textarea
+            rows={4}
+            placeholder="Ex: Estamos buscando um(a) estagiário(a) para apoiar operações B2B em BH. Deve ter interesse em ferramentas (Excel/Sheets) e contato com fornecedores. Bons exemplos: https://www.linkedin.com/in/fulano (estagiária atual de operações na XP)..."
+            value={textoLivre}
+            onChange={(e) => setTextoLivre(e.target.value)}
+            disabled={extraindo}
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">
+              {textoLivre.length} caracteres · mínimo 30 pra extrair
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={onExtrair}
+              disabled={extraindo || textoLivre.trim().length < 30}
+            >
+              {extraindo && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+              {extraindo ? "Extraindo..." : "Extrair campos com IA"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Briefing da vaga</CardTitle>

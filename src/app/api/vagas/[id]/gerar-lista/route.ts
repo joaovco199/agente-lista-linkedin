@@ -21,6 +21,7 @@ import {
   direcionamentoSchema,
   ranquearCandidatosSchema,
 } from "@/types/api";
+import { getNotasProspecao } from "@/lib/configuracoes";
 import type { PerfilReferencia, Vaga } from "@/types/vaga";
 import type { Candidato } from "@/types/candidato";
 
@@ -121,36 +122,64 @@ export async function POST(
     }
   }
 
-  // 2.5) Monta lista de queries (preferindo plataforma=google), usando as
-  // search strings (refinadas se tiver decisões).
-  const googleStrings = searchStringsEmUso.filter(
-    (s) => s.plataforma === "google"
-  );
-  const queries =
-    googleStrings.length > 0 ? googleStrings : searchStringsEmUso;
-
-  const desiredCountry = inferCountryFromLocation(vaga.localizacao);
-  let serpResults: SerpResult[] = [];
+  // 2.5) Tenta TODAS as search strings (google + linkedin) e ACUMULA
+  // resultados, deduplicando por URL. Se nada vier, faz 2ª rodada prefixando
+  // `site:linkedin.com/in` nas strings (caso o Claude tenha esquecido).
+  const localizacaoParaBusca = vaga.localizacao;
+  const desiredCountry = inferCountryFromLocation(localizacaoParaBusca);
+  const serpResultsMap = new Map<string, SerpResult>();
   const queriesTentadas: string[] = [];
-  for (const q of queries) {
+  const MAX_RESULTS_ACUMULADOS = 30;
+
+  async function tentarQuery(query: string) {
     try {
-      queriesTentadas.push(q.string);
-      const raw = await serpapiSearch(q.string, 20, {
-        location: vaga.localizacao,
+      queriesTentadas.push(query);
+      const raw = await serpapiSearch(query, 20, {
+        location: localizacaoParaBusca,
         gl: desiredCountry ?? "br",
       });
       const filtered = filterByCountry(raw, desiredCountry);
-      // Se o filtro derrubou tudo, prefere raw (Claude ainda vai penalizar).
       const results = filtered.length > 0 ? filtered : raw;
-      if (results.length >= 3) {
-        serpResults = results;
-        break;
+      for (const r of results) {
+        if (!serpResultsMap.has(r.url)) {
+          serpResultsMap.set(r.url, r);
+        }
       }
-      if (results.length > serpResults.length) serpResults = results;
     } catch (err) {
       console.warn("[gerar-lista] SerpApi falhou em uma query:", err);
     }
   }
+
+  // Rodada 1: TODAS as strings, do jeito que vieram.
+  for (const q of searchStringsEmUso) {
+    await tentarQuery(q.string);
+    if (serpResultsMap.size >= MAX_RESULTS_ACUMULADOS) break;
+  }
+
+  // Rodada 2 (fallback): se nada foi encontrado, força `site:linkedin.com/in`.
+  if (serpResultsMap.size === 0) {
+    for (const q of searchStringsEmUso) {
+      const comSite = q.string.includes("site:linkedin.com/in")
+        ? q.string
+        : `site:linkedin.com/in ${q.string}`;
+      await tentarQuery(comSite);
+    }
+  }
+
+  // Rodada 3 (fallback forte): query simplificada só com cargo + cidade.
+  if (serpResultsMap.size === 0) {
+    const cargoKw = vaga.cargo_senioridade.split(/[,-]/)[0].trim();
+    const cidadeKw = vaga.localizacao.split(",")[0].trim();
+    if (cargoKw && cidadeKw) {
+      await tentarQuery(
+        `site:linkedin.com/in "${cargoKw}" "${cidadeKw}"`
+      );
+    }
+  }
+
+  let serpResults: SerpResult[] = Array.from(serpResultsMap.values()).map(
+    (r, i) => ({ ...r, index: i + 1 })
+  );
 
   if (serpResults.length === 0) {
     await marcarErro(vagaId);
@@ -186,10 +215,10 @@ export async function POST(
         icp: icpEmUso,
         localizacao: vaga.localizacao,
         modalidade: vaga.modalidade,
-        // Concatena perfis originais do briefing + decisões de rodadas anteriores.
         bonsPerfis: [...vaga.bons_perfis, ...aceitosAnteriores],
         mausPerfis: [...vaga.maus_perfis, ...rejeitadosAnteriores],
         candidatos: serpResultsNovos,
+        notasGlobais: await getNotasProspecao(),
       }),
       tool: callCTool,
       model: "default",

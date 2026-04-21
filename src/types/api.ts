@@ -19,6 +19,9 @@ export const criarVagaBodySchema = z.object({
     .string()
     .min(3, "Informe cargo e senioridade (ex: AE Sênior)"),
   localizacao: z.string().min(2, "Informe a localização alvo"),
+  modalidade: z.enum(["presencial", "hibrido", "remoto"], {
+    required_error: "Escolha a modalidade da vaga",
+  }),
   bons_perfis: z
     .array(perfilReferenciaSchema)
     .min(1, "Forneça pelo menos 1 bom perfil de referência")

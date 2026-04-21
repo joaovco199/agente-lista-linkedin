@@ -3,11 +3,14 @@ export type PerfilReferencia = {
   razao: string;
 };
 
+export type ModalidadeVaga = "presencial" | "hibrido" | "remoto";
+
 export type FormularioVaga = {
   jd: string;
   keywords: string;
   cargo_senioridade: string;
   localizacao: string;
+  modalidade: ModalidadeVaga;
   bons_perfis: PerfilReferencia[];
   maus_perfis: PerfilReferencia[];
 };
@@ -42,6 +45,7 @@ export type Vaga = {
   keywords: string;
   cargo_senioridade: string;
   localizacao: string;
+  modalidade: ModalidadeVaga | null;
   bons_perfis: PerfilReferencia[];
   maus_perfis: PerfilReferencia[];
   icp: ICP | null;

@@ -42,6 +42,7 @@ export async function POST(request: Request) {
       keywords: form.keywords,
       cargo_senioridade: form.cargo_senioridade,
       localizacao: form.localizacao,
+      modalidade: form.modalidade,
       bons_perfis: form.bons_perfis,
       maus_perfis: form.maus_perfis,
       status: "rascunho",

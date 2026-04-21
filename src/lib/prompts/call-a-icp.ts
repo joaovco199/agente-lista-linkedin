@@ -1,5 +1,20 @@
 import type { ClaudeTool } from "@/lib/anthropic";
-import type { FormularioVaga } from "@/types/vaga";
+import type { FormularioVaga, ModalidadeVaga } from "@/types/vaga";
+
+function instrucaoLocalizacaoPorModalidade(
+  modalidade: ModalidadeVaga,
+  localizacao: string
+): string {
+  switch (modalidade) {
+    case "remoto":
+      return `Modalidade: REMOTO. Use variações de "remote"/"remoto" e o PAÍS derivado de "${localizacao}" (ex: \`("remoto" OR "remote") AND "Brasil"\`). NÃO prenda à cidade — remoto cobre o país todo.`;
+    case "hibrido":
+      return `Modalidade: HÍBRIDO. Use variações da cidade em "${localizacao}" + região metropolitana, mais o país (ex: \`("São Paulo" OR "Guarulhos" OR "Grande São Paulo") AND "Brasil"\`). NUNCA use o estado inteiro ("MG", "Minas Gerais") como OR da cidade — isso traz cidades irrelevantes.`;
+    case "presencial":
+    default:
+      return `Modalidade: PRESENCIAL. Use apenas variações da cidade em "${localizacao}" (nome completo + siglas curtas da própria cidade, ex: \`("Belo Horizonte" OR "BH")\`, \`("São Paulo" OR "SP capital")\`), mais o país. NUNCA use o estado ("MG", "Minas Gerais", "SP") como OR da cidade — isso traz cidades vizinhas do estado inteiro.`;
+  }
+}
 
 export const callASystem = `Você é um recrutador técnico sênior com 10 anos de experiência montando listas de candidatos no LinkedIn para qualquer tipo de vaga em startups brasileiras (Vendas, CS, RevOps, Engenharia, Produto, Finanças, Operações, Marketing, People, Jurídico, etc.).
 
@@ -15,7 +30,7 @@ Regras duras:
 - Não invente skills, empresas ou cargos que não apareçam no briefing, nas keywords ou nos perfis de referência.
 - Os \`titulos\` devem ser cargos coerentes com a área da JD (ex: se JD é de CFO, use "CFO", "Head of Finance", "VP Finance", "Diretor Financeiro"; nunca misturar com cargos de outra área).
 - Search strings devem ser copiáveis sem edição. Nada de placeholders tipo "<cargo>".
-- **A cidade é o filtro mais importante de localização**: TODAS as 3 strings devem incluir o nome da **cidade** literal entre aspas, MAIS o estado/sigla (quando houver), MAIS o país. Ex: se o usuário pede "Belo Horizonte, MG", use \`("Belo Horizonte" OR "MG" OR "Minas Gerais") AND "Brasil"\`. Se pede "São Paulo, SP", use \`("São Paulo" OR "SP") AND "Brasil"\`. Se pede só "Brasil", use \`"Brasil" OR "Brazil"\`. Se pede "Remoto", use \`("remoto" OR "remote")\`. Nunca gere search string que ignore a cidade pedida.
+- **A localização é fundamental e depende da modalidade**: você receberá uma instrução específica de localização no user prompt. Siga-a literalmente.
 - Gere EXATAMENTE 3 search strings, cada uma com ângulo diferente: (a) cargo + skills chave + localização, (b) empresas similares + senioridade + localização, (c) ângulo lateral (cargos adjacentes ou skills nice-to-have) + localização.
 - Skills must = não-negociáveis. Skills nice = diferenciais.
 - Sinais a evitar = padrões que os perfis a evitar compartilham (ex: "só experiência em SDR sem promoção a AE", "apenas vendas inbound", "viés de empresa grande sem experiência startup").`;
@@ -50,8 +65,9 @@ ${form.cargo_senioridade}
 ## Palavras-chave
 ${form.keywords}
 
-## Localização
-${form.localizacao}
+## Localização e modalidade
+Cidade/região informada: ${form.localizacao}
+${instrucaoLocalizacaoPorModalidade(form.modalidade, form.localizacao)}
 
 ## Bons perfis de referência (${form.bons_perfis.length})
 ${bons}

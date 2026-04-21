@@ -11,6 +11,7 @@ create table public.vagas (
   keywords text not null,
   cargo_senioridade text not null,
   localizacao text not null,
+  modalidade text check (modalidade is null or modalidade in ('presencial','hibrido','remoto')),
   bons_perfis jsonb not null default '[]'::jsonb,
   maus_perfis jsonb not null default '[]'::jsonb,
   icp jsonb,

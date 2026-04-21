@@ -1,6 +1,21 @@
 import type { ClaudeTool } from "@/lib/anthropic";
-import type { ICP, PerfilReferencia } from "@/types/vaga";
+import type { ICP, ModalidadeVaga, PerfilReferencia } from "@/types/vaga";
 import type { SerpResult } from "@/lib/serpapi";
+
+function regraLocalizacaoPorModalidade(
+  modalidade: ModalidadeVaga | null
+): string {
+  switch (modalidade) {
+    case "remoto":
+      return `Modalidade REMOTO: só importa o país. Cidade do candidato é irrelevante, desde que seja no mesmo país. Se o candidato é de outro país, score máximo 1.`;
+    case "hibrido":
+      return `Modalidade HÍBRIDO: cidade da vaga OU região metropolitana são aceitas sem penalidade. Outras cidades do mesmo país → score máximo 3. Outro país → score máximo 1.`;
+    case "presencial":
+      return `Modalidade PRESENCIAL: o candidato PRECISA estar na cidade indicada. Cidade diferente no mesmo país → score máximo 2. Região metropolitana imediata (ex: Guarulhos pra São Paulo) → aceita sem penalidade. Outro país → score máximo 1.`;
+    default:
+      return `Modalidade não informada: trate como presencial (cidade é obrigatória). Outra cidade no mesmo país → score máximo 2.`;
+  }
+}
 
 export const callCSystem = `Você é um recrutador técnico sênior fazendo o ranking final de candidatos para uma vaga.
 
@@ -46,11 +61,13 @@ Como a fonte é limitada, **sempre inclua pelo menos 1 highlight** citando títu
 export function buildCallCUser(params: {
   icp: ICP;
   localizacao: string;
+  modalidade: ModalidadeVaga | null;
   bonsPerfis: PerfilReferencia[];
   mausPerfis: PerfilReferencia[];
   candidatos: SerpResult[];
 }): string {
-  const { icp, localizacao, bonsPerfis, mausPerfis, candidatos } = params;
+  const { icp, localizacao, modalidade, bonsPerfis, mausPerfis, candidatos } =
+    params;
 
   const bonsTxt = bonsPerfis.length
     ? bonsPerfis.map((p) => `URL: ${p.url}\nRazão: ${p.razao}`).join("\n---\n")
@@ -72,8 +89,9 @@ Snippet: ${c.snippet || "(vazio)"}`
   return `# ICP
 ${JSON.stringify(icp, null, 2)}
 
-# Localização da vaga (NÃO-NEGOCIÁVEL)
-${localizacao}
+# Localização e modalidade (NÃO-NEGOCIÁVEL)
+Cidade da vaga: ${localizacao}
+${regraLocalizacaoPorModalidade(modalidade)}
 
 # Perfis bons de referência
 ${bonsTxt}

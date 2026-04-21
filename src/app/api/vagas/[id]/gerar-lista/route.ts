@@ -96,6 +96,7 @@ export async function POST(
       user: buildCallCUser({
         icp: vaga.icp,
         localizacao: vaga.localizacao,
+        modalidade: vaga.modalidade,
         bonsPerfis: vaga.bons_perfis,
         mausPerfis: vaga.maus_perfis,
         candidatos: serpResults,

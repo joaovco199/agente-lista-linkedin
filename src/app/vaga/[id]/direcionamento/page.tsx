@@ -35,7 +35,11 @@ export default async function DirecionamentoPage({
             ← Voltar
           </Link>
           <h1 className="mt-2 text-2xl font-bold">{cargo_senioridade}</h1>
-          <p className="text-sm text-muted-foreground">Direcionamento gerado</p>
+          <p className="text-sm text-muted-foreground">
+            {data.localizacao}
+            {data.modalidade ? ` · ${data.modalidade}` : ""} · direcionamento
+            gerado
+          </p>
         </div>
         <Badge variant={status === "lista_gerada" ? "default" : "secondary"}>
           {status}

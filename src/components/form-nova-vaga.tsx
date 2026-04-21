@@ -26,6 +26,7 @@ export type FormValues = {
   keywords: string;
   cargo_senioridade: string;
   localizacao: string;
+  modalidade: "presencial" | "hibrido" | "remoto";
   bons_perfis: { url: string; razao: string }[];
   maus_perfis: { url: string; razao: string }[];
 };
@@ -37,9 +38,16 @@ const defaultValues: FormValues = {
   keywords: "",
   cargo_senioridade: "",
   localizacao: "",
+  modalidade: "presencial",
   bons_perfis: Array.from({ length: 5 }, () => ({ ...slotVazio })),
   maus_perfis: Array.from({ length: 5 }, () => ({ ...slotVazio })),
 };
+
+const MODALIDADES: { value: FormValues["modalidade"]; label: string; hint: string }[] = [
+  { value: "presencial", label: "Presencial", hint: "Candidatos precisam estar na cidade" },
+  { value: "hibrido", label: "Híbrido", hint: "Cidade ou região metropolitana" },
+  { value: "remoto", label: "Remoto", hint: "Qualquer lugar do país" },
+];
 
 function slotPreenchido(p: { url: string; razao: string }): boolean {
   return p.url.trim() !== "" || p.razao.trim() !== "";
@@ -125,12 +133,37 @@ export function FormNovaVaga() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="localizacao">Localização</Label>
+              <Label htmlFor="localizacao">Localização (cidade)</Label>
               <Input
                 id="localizacao"
-                placeholder="ex: São Paulo, Brasil (ou Remoto — Brasil)"
+                placeholder="ex: São Paulo, Brasil"
                 {...form.register("localizacao")}
               />
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <Label>Modalidade</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {MODALIDADES.map((m) => {
+                const ativo = form.watch("modalidade") === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => form.setValue("modalidade", m.value)}
+                    className={`rounded-md border p-3 text-left transition ${
+                      ativo
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="text-sm font-medium">{m.label}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {m.hint}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="grid gap-2">

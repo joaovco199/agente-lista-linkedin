@@ -13,7 +13,8 @@ import {
   callCTool,
 } from "@/lib/prompts/call-c-ranking";
 import { ranquearCandidatosSchema } from "@/types/api";
-import type { Vaga } from "@/types/vaga";
+import type { PerfilReferencia, Vaga } from "@/types/vaga";
+import type { Candidato } from "@/types/candidato";
 
 export const maxDuration = 60;
 
@@ -53,6 +54,23 @@ export async function POST(
   const queries =
     googleStrings.length > 0 ? googleStrings : vaga.search_strings;
 
+  // 2) Carrega candidatos já existentes pra preservar os decididos e evitar duplicatas.
+  const { data: existentes } = await supabase
+    .from("candidatos_gerados")
+    .select("*")
+    .eq("vaga_id", vagaId)
+    .returns<Candidato[]>();
+
+  const urlsJaVistas = new Set(
+    (existentes ?? []).map((c) => c.linkedin_url)
+  );
+  const aceitosAnteriores: PerfilReferencia[] = (existentes ?? [])
+    .filter((c) => c.decisao === "aceito" && c.decisao_razao)
+    .map((c) => ({ url: c.linkedin_url, razao: c.decisao_razao! }));
+  const rejeitadosAnteriores: PerfilReferencia[] = (existentes ?? [])
+    .filter((c) => c.decisao === "rejeitado" && c.decisao_razao)
+    .map((c) => ({ url: c.linkedin_url, razao: c.decisao_razao! }));
+
   const desiredCountry = inferCountryFromLocation(vaga.localizacao);
   let serpResults: SerpResult[] = [];
   const queriesTentadas: string[] = [];
@@ -88,6 +106,19 @@ export async function POST(
     );
   }
 
+  // 2.5) Remove URLs já existentes (aceitas, rejeitadas ou pendentes) pra não duplicar.
+  const serpResultsNovos = serpResults.filter((r) => !urlsJaVistas.has(r.url));
+  if (serpResultsNovos.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Todos os resultados do Google já foram avaliados em execuções anteriores. Refine o briefing ou aguarde novos perfis aparecerem.",
+        queriesTentadas,
+      },
+      { status: 409 }
+    );
+  }
+
   // 3) Call C — Claude filtra + ranqueia em uma só chamada.
   let ranking;
   try {
@@ -97,9 +128,10 @@ export async function POST(
         icp: vaga.icp,
         localizacao: vaga.localizacao,
         modalidade: vaga.modalidade,
-        bonsPerfis: vaga.bons_perfis,
-        mausPerfis: vaga.maus_perfis,
-        candidatos: serpResults,
+        // Concatena perfis originais do briefing + decisões de rodadas anteriores.
+        bonsPerfis: [...vaga.bons_perfis, ...aceitosAnteriores],
+        mausPerfis: [...vaga.maus_perfis, ...rejeitadosAnteriores],
+        candidatos: serpResultsNovos,
       }),
       tool: callCTool,
       model: "default",
@@ -124,26 +156,34 @@ export async function POST(
     );
   }
 
-  // 4) Persiste candidatos — usa o snippet/title do SerpApi como nome/cargo
-  // quando possível (não temos Proxycurl nessa versão).
-  const byUrl = new Map(serpResults.map((r) => [r.url, r]));
-  const rows = ranking.map((r) => {
-    const serp = byUrl.get(r.linkedin_url);
-    return {
-      vaga_id: vagaId,
-      linkedin_url: r.linkedin_url,
-      nome: serp?.title?.split(" - ")[0] ?? null,
-      cargo: serp?.title?.split(" - ")[1]?.split(" | ")[0] ?? null,
-      empresa: null,
-      enrichment_json: serp ? { title: serp.title, snippet: serp.snippet } : null,
-      score: r.score,
-      justificativa: r.justificativa,
-      highlights: r.highlights,
-    };
-  });
+  // 4) Persiste candidatos novos. Remove APENAS os candidatos anteriores
+  // sem decisão (pendentes) — preserva aprovados e rejeitados.
+  const byUrl = new Map(serpResultsNovos.map((r) => [r.url, r]));
+  const rows = ranking
+    .filter((r) => !urlsJaVistas.has(r.linkedin_url)) // defesa extra
+    .map((r) => {
+      const serp = byUrl.get(r.linkedin_url);
+      return {
+        vaga_id: vagaId,
+        linkedin_url: r.linkedin_url,
+        nome: serp?.title?.split(" - ")[0] ?? null,
+        cargo: serp?.title?.split(" - ")[1]?.split(" | ")[0] ?? null,
+        empresa: null,
+        enrichment_json: serp
+          ? { title: serp.title, snippet: serp.snippet }
+          : null,
+        score: r.score,
+        justificativa: r.justificativa,
+        highlights: r.highlights,
+      };
+    });
 
-  // Apaga candidatos antigos dessa vaga (caso seja re-geração) e insere novos.
-  await supabase.from("candidatos_gerados").delete().eq("vaga_id", vagaId);
+  // Apaga só os pendentes (decisao IS NULL) da vaga, preserva decididos.
+  await supabase
+    .from("candidatos_gerados")
+    .delete()
+    .eq("vaga_id", vagaId)
+    .is("decisao", null);
   const { error: insertErr } = await supabase
     .from("candidatos_gerados")
     .insert(rows);
@@ -166,7 +206,10 @@ export async function POST(
     data: {
       vagaId,
       total_serp: serpResults.length,
+      total_serp_novos: serpResultsNovos.length,
       total_ranqueados: ranking.length,
+      total_aceitos_preservados: aceitosAnteriores.length,
+      total_rejeitados_preservados: rejeitadosAnteriores.length,
       queriesTentadas,
     },
   });

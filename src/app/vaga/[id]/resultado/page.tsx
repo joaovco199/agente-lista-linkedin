@@ -4,10 +4,20 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DecisaoCandidato } from "@/components/decisao-candidato";
+import { BotaoGerarLista } from "@/components/botao-gerar-lista";
 import type { Vaga } from "@/types/vaga";
 import type { Candidato, Highlight } from "@/types/candidato";
 
 export const dynamic = "force-dynamic";
+
+type Filtro = "todos" | "aceitos" | "rejeitados" | "pendentes";
+
+const FILTROS: { value: Filtro; label: string }[] = [
+  { value: "todos", label: "Todos" },
+  { value: "aceitos", label: "Aceitos" },
+  { value: "rejeitados", label: "Rejeitados" },
+  { value: "pendentes", label: "Pendentes" },
+];
 
 function scoreColor(score: number | null): string {
   if (!score) return "bg-muted";
@@ -18,12 +28,33 @@ function scoreColor(score: number | null): string {
   return "bg-red-600 text-white";
 }
 
+function aplicaFiltro(lista: Candidato[], filtro: Filtro): Candidato[] {
+  switch (filtro) {
+    case "aceitos":
+      return lista.filter((c) => c.decisao === "aceito");
+    case "rejeitados":
+      return lista.filter((c) => c.decisao === "rejeitado");
+    case "pendentes":
+      return lista.filter((c) => c.decisao === null);
+    default:
+      return lista;
+  }
+}
+
 export default async function ResultadoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ filtro?: string }>;
 }) {
   const { id } = await params;
+  const { filtro: filtroRaw } = await searchParams;
+  const filtro: Filtro = (
+    ["todos", "aceitos", "rejeitados", "pendentes"] as const
+  ).includes(filtroRaw as Filtro)
+    ? (filtroRaw as Filtro)
+    : "todos";
 
   const [{ data: vaga }, { data: candidatos }] = await Promise.all([
     supabase.from("vagas").select("*").eq("id", id).single<Vaga>(),
@@ -38,10 +69,17 @@ export default async function ResultadoPage({
   if (!vaga) return notFound();
 
   const lista = candidatos ?? [];
+  const contadores = {
+    todos: lista.length,
+    aceitos: lista.filter((c) => c.decisao === "aceito").length,
+    rejeitados: lista.filter((c) => c.decisao === "rejeitado").length,
+    pendentes: lista.filter((c) => c.decisao === null).length,
+  };
+  const listaFiltrada = aplicaFiltro(lista, filtro);
 
   return (
     <main className="mx-auto max-w-4xl p-6 md:p-10">
-      <header className="mb-8 flex items-end justify-between gap-4">
+      <header className="mb-6 flex items-start justify-between gap-4">
         <div>
           <Link
             href={`/vaga/${id}/direcionamento`}
@@ -51,25 +89,56 @@ export default async function ResultadoPage({
           </Link>
           <h1 className="mt-2 text-2xl font-bold">{vaga.cargo_senioridade}</h1>
           <p className="text-sm text-muted-foreground">
-            {lista.length} candidatos ranqueados · {vaga.localizacao}
+            {vaga.localizacao}
+            {vaga.modalidade ? ` · ${vaga.modalidade}` : ""}
           </p>
         </div>
-        <Badge variant={vaga.status === "lista_gerada" ? "default" : "secondary"}>
-          {vaga.status}
-        </Badge>
+        <BotaoGerarLista vagaId={id} statusAtual={vaga.status} />
       </header>
 
-      {lista.length === 0 ? (
+      {lista.length > 0 && (
+        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 p-3">
+          {FILTROS.map((f) => {
+            const ativo = filtro === f.value;
+            const count = contadores[f.value];
+            return (
+              <Link
+                key={f.value}
+                href={
+                  f.value === "todos"
+                    ? `/vaga/${id}/resultado`
+                    : `/vaga/${id}/resultado?filtro=${f.value}`
+                }
+                className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition ${
+                  ativo
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted"
+                }`}
+              >
+                <span>{f.label}</span>
+                <Badge
+                  variant={ativo ? "secondary" : "outline"}
+                  className="text-[10px]"
+                >
+                  {count}
+                </Badge>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {listaFiltrada.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Nenhum candidato salvo ainda.
-            <br />
-            Volte no direcionamento e clique em &quot;Gerar lista&quot;.
+            {lista.length === 0
+              ? "Nenhum candidato ainda. Clique em “Gerar lista” pra começar."
+              : `Nenhum candidato em "${filtro}".`}
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
-          {lista.map((c, i) => (
+          {listaFiltrada.map((c, i) => (
             <Card key={c.id}>
               <CardHeader className="flex flex-row items-start justify-between gap-4 pb-2">
                 <div className="flex items-start gap-3">

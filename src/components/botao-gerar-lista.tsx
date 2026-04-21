@@ -52,9 +52,9 @@ export function BotaoGerarLista({ vagaId, statusAtual }: Props) {
     >
       {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
       {loading
-        ? "Gerando lista..."
+        ? "Gerando..."
         : jaGerou
-          ? "Re-gerar lista"
+          ? "Gerar mais candidatos"
           : "Gerar lista de candidatos"}
     </Button>
   );

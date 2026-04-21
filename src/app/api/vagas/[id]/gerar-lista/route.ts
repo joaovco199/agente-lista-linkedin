@@ -156,8 +156,8 @@ export async function POST(
     );
   }
 
-  // 4) Persiste candidatos novos. Remove APENAS os candidatos anteriores
-  // sem decisão (pendentes) — preserva aprovados e rejeitados.
+  // 4) Persiste candidatos novos. NADA é apagado — aceitos, rejeitados e
+  // pendentes anteriores ficam todos. Duplicatas já foram filtradas acima.
   const byUrl = new Map(serpResultsNovos.map((r) => [r.url, r]));
   const rows = ranking
     .filter((r) => !urlsJaVistas.has(r.linkedin_url)) // defesa extra
@@ -178,12 +178,6 @@ export async function POST(
       };
     });
 
-  // Apaga só os pendentes (decisao IS NULL) da vaga, preserva decididos.
-  await supabase
-    .from("candidatos_gerados")
-    .delete()
-    .eq("vaga_id", vagaId)
-    .is("decisao", null);
   const { error: insertErr } = await supabase
     .from("candidatos_gerados")
     .insert(rows);

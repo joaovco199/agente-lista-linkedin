@@ -7,6 +7,11 @@ Thumbs.db
 
 # Node.js (se usar)
 node_modules/
+.next/
+out/
+build/
+next-env.d.ts
+.vercel
 
 # Python (se usar)
 __pycache__/

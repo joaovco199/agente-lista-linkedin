@@ -35,13 +35,15 @@ export type SerpSearchOptions = {
 
 /**
  * Busca no Google via SerpApi e retorna resultados que apontam pra /in/ do LinkedIn.
+ * Se `location` não for reconhecida pelo SerpApi, faz retry sem ela (preserva
+ * `gl` e `google_domain` pra geo-biasing via IP).
  */
 export async function serpapiSearch(
   query: string,
   numResults = 20,
   { signal, location, gl = "br" }: SerpSearchOptions = {}
 ): Promise<SerpResult[]> {
-  const params = new URLSearchParams({
+  const baseParams = {
     q: query,
     api_key: SERPAPI_KEY!,
     engine: "google",
@@ -49,16 +51,36 @@ export async function serpapiSearch(
     hl: "pt-br",
     gl,
     google_domain: gl === "br" ? "google.com.br" : "google.com",
-  });
-  if (location) params.set("location", location);
+  };
 
-  const url = `https://serpapi.com/search.json?${params.toString()}`;
-  const resp = await fetch(url, { signal, cache: "no-store" });
+  const doFetch = async (withLocation: string | null) => {
+    const params = new URLSearchParams(baseParams);
+    if (withLocation) params.set("location", withLocation);
+    const url = `https://serpapi.com/search.json?${params.toString()}`;
+    return fetch(url, { signal, cache: "no-store" });
+  };
+
+  let resp = await doFetch(location ?? null);
+
+  // Se deu 400 por `location` não suportada, retry sem location.
+  if (!resp.ok && resp.status === 400 && location) {
+    const errText = await resp.text();
+    if (/location/i.test(errText) && /unsupported/i.test(errText)) {
+      console.warn(
+        `[serpapi] location "${location}" não suportada — tentando sem location (gl=${gl})`
+      );
+      resp = await doFetch(null);
+    } else {
+      throw new Error(`SerpApi retornou HTTP ${resp.status}: ${errText}`);
+    }
+  }
+
   if (!resp.ok) {
     throw new Error(
       `SerpApi retornou HTTP ${resp.status}: ${await resp.text().catch(() => "")}`
     );
   }
+
   const json = (await resp.json()) as SerpApiResponse;
   if (json.error) {
     throw new Error(`SerpApi error: ${json.error}`);
@@ -68,7 +90,6 @@ export async function serpapiSearch(
   return organic
     .filter((r): r is Required<Pick<SerpApiOrganic, "link">> & SerpApiOrganic => {
       if (!r.link) return false;
-      // Só URLs públicas de perfil (/in/). Pula posts, /pub/, /company/.
       return /^https?:\/\/[^/]*linkedin\.com\/in\//i.test(r.link);
     })
     .map((r, i) => ({
